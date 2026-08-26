@@ -1,0 +1,23 @@
+---
+- name: Standardized Proxmox LXC Provisioning
+  hosts: proxmox
+  gather_facts: no
+  tasks:
+    - name: Execute Standard API Container Deployment
+      community.general.proxmox_lxc:
+        api_host: "192.168.1.5"
+        api_user: "root@pam"
+        api_password: "YOUR_REAL_PROXMOX_ROOT_PASSWORD"
+        node: "prox1"
+        vmid: 200
+        hostname: "ubuntu-app"
+        ostemplate: "local:vztmpl/ubuntu-26.04-standard_26.04-1_amd64.tar.zst"
+        storage: "local-lvm"
+        disk: 8
+        cores: 2
+        memory: 2048
+        netif:
+          net0: "name=eth0,bridge=vmbr0,ip=dhcp"
+        state: present
+        onboot: true
+      when: inventory_hostname == "192.168.1.5"
