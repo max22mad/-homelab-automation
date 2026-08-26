@@ -2,8 +2,6 @@
 - name: Standardized Proxmox LXC Provisioning
   hosts: all
   gather_facts: no
-  collections:
-    - community.general
 
   tasks:
     - name: Execute Standard API Container Deployment
