@@ -1,7 +1,10 @@
 ---
 - name: Standardized Proxmox LXC Provisioning
-  hosts: proxmox
+  hosts: all
   gather_facts: no
+  collections:
+    - community.general
+
   tasks:
     - name: Execute Standard API Container Deployment
       community.general.proxmox_lxc:
@@ -20,4 +23,3 @@
           net0: "name=eth0,bridge=vmbr0,ip=dhcp"
         state: present
         onboot: true
-      when: inventory_hostname == "192.168.1.5"
