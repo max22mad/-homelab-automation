@@ -1,23 +1,57 @@
 ---
 - name: Standardized Proxmox LXC Provisioning
-  hosts: all
+  hosts: localhost
+  connection: local
   gather_facts: no
 
+  vars:
+    proxmox_api_host: "192.168.1.5"
+    proxmox_node: "prox1"
+    proxmox_user: "root@pam"
+    proxmox_vmid: 200
+    proxmox_hostname: "ubuntu-app"
+    proxmox_template: "local:vztmpl/ubuntu-26.04-standard_26.04-1_amd64.tar.zst"
+
   tasks:
-    - name: Execute Standard API Container Deployment
-      community.general.proxmox_lxc:
-        api_host: "192.168.1.5"
-        api_user: "root@pam"
-        api_password: "{{ proxmox_root_password }}"
-        node: "prox1"
-        vmid: 200
-        hostname: "ubuntu-app"
-        ostemplate: "local:vztmpl/ubuntu-26.04-standard_26.04-1_amd64.tar.zst"
-        storage: "local-lvm"
-        disk: 8
-        cores: 2
-        memory: 2048
-        netif:
-          net0: "name=eth0,bridge=vmbr0,ip=dhcp"
-        state: present
-        onboot: true
+
+    - name: Authenticate to Proxmox API
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/access/ticket"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          username: "{{ proxmox_user }}"
+          password: "{{ proxmox_root_password }}"
+        validate_certs: false
+        return_content: true
+      register: proxmox_auth
+      no_log: true
+
+    - name: Create LXC container
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/lxc"
+        method: POST
+        headers:
+          Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
+          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+        body_format: form-urlencoded
+        body:
+          vmid: "{{ proxmox_vmid }}"
+          hostname: "{{ proxmox_hostname }}"
+          ostemplate: "{{ proxmox_template }}"
+          storage: "local-lvm"
+          rootfs: "8"
+          cores: "2"
+          memory: "2048"
+          net0: "name=eth0,bridge=vmbr0,ip=dhcp,type=veth"
+          onboot: 1
+          unprivileged: 1
+        validate_certs: false
+        return_content: true
+        status_code: 200
+      register: lxc_create
+      no_log: true
+
+    - name: Display LXC creation result
+      ansible.builtin.debug:
+        msg: "LXC {{ proxmox_vmid }} creation request submitted successfully."
