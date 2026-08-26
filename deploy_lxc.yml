@@ -7,7 +7,7 @@
       community.general.proxmox_lxc:
         api_host: "192.168.1.5"
         api_user: "root@pam"
-        api_password: "YOUR_REAL_PROXMOX_ROOT_PASSWORD"
+        api_password: "{{ proxmox_root_password }}"
         node: "prox1"
         vmid: 200
         hostname: "ubuntu-app"
