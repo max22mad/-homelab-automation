@@ -1,0 +1,17 @@
+---
+- name: Standardized Proxmox Ubuntu LXC Provisioning
+  hosts: localhost
+  gather_facts: false
+  vars:
+    proxmox_node: "pve"
+    vmid: 204
+    hostname: ubuntu-lts
+    ostemplate: "local:vztmpl/ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
+    storage: "local-lvm"
+    cores: 2
+    memory: 2048
+
+  tasks:
+    - name: Ensure Proxmox Container is Provisioned
+      ansible.builtin.debug:
+        msg: "Ready to deploy Ubuntu container to Proxmox"
