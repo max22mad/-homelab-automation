@@ -3,9 +3,12 @@
   hosts: localhost
   gather_facts: false
   vars:
+    proxmox_api_host: "{{ lookup('env', 'PROXMOX_HOST') }}"
+    proxmox_api_user: "{{ lookup('env', 'PROXMOX_USER') }}"
+    proxmox_api_password: "{{ lookup('env', 'PROXMOX_PASSWORD') }}"
     proxmox_node: "pve"
     vmid: 204
-    hostname: ubuntu-lts
+    hostname: "ubuntu-lts"
     ostemplate: "local:vztmpl/ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
     storage: "local-lvm"
     cores: 2
@@ -13,5 +16,21 @@
 
   tasks:
     - name: Ensure Proxmox Container is Provisioned
-      ansible.builtin.debug:
-        msg: "Ready to deploy Ubuntu container to Proxmox"
+      community.proxmox.proxmox:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vmid }}"
+        hostname: "{{ hostname }}"
+        ostemplate: "{{ ostemplate }}"
+        storage: "{{ storage }}"
+        cores: "{{ cores }}"
+        memory: "{{ memory }}"
+        swap: 512
+        netif: '{"net0":"name=eth0,bridge=vmbr0,ip=dhcp"}'
+        unprivileged: true
+        state: present
+        start: true
+      delegate_to: localhost---
+-
