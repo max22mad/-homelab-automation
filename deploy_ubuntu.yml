@@ -1,77 +1,77 @@
 ---
 - name: Standardized Proxmox LXC Provisioning
   hosts: localhost
-  gather_facts: false
+  connection: local
+  gather_facts: no
   vars:
-    proxmox_host: "192.168.1.5"
-    proxmox_user: "root@pam"
-
-    # It's best to keep these in Semaphore environment variables
-    proxmox_api_url: "https://yourdomain.local"
+    proxmox_api_host: "192.168.1.5"
     proxmox_node: "prox1"
-    proxmox_storage: "local"
-    lxc_template_name: "ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
+    proxmox_user: "root@pam"
+    proxmox_vmid: 203
+    proxmox_hostname: "ubuntu-container"
+    proxmox_template: "local:vztmpl/ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
+    template_filename: "ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
 
   tasks:
-    # 1. AUTHENTICATE FIRST (Using the password you fixed in Task #65)
+    # 1. AUTHENTICATE TO API
     - name: Authenticate to Proxmox API
       ansible.builtin.uri:
-        url: "https://{{ proxmox_host }}:8006/api2/json/access/ticket"
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/access/ticket"
         method: POST
         body_format: form-urlencoded
         body:
           username: "{{ proxmox_user }}"
           password: "{{ proxmox_root_password }}"
         validate_certs: false
+        return_content: true
       register: proxmox_auth
       no_log: true
 
-        # 2. DOWNLOAD TEMPLATE VIA API
-- name: Check if Ubuntu 24.04 Template is Present
-  ansible.builtin.uri:
-    url: "https://{{ proxmox_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_storage }}/content?content=vztmpl"
-    method: GET
-    headers:
-      CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
-      Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-    validate_certs: false
-    status_code: [200]
-  register: template_status
-
-- name: Download Ubuntu 24.04 Template if missing
-  ansible.builtin.uri:
-    url: "https://{{ proxmox_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_storage }}/download-url"
-    method: POST
-    headers:
-      CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
-      Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-    body_format: form-urlencoded
-    body:
-      content: vztmpl
-      filename: "{{ lxc_template_name }}"
-      url: "http://download.proxmox.com/images/system/{{ lxc_template_name }}"
-    validate_certs: false
-    status_code: [200]
-  when: template_status.json.data | selectattr('volid', 'search', lxc_template_name) | list | length == 0
-
-
-
-    # 3. CREATE LXC CONTAINER (Only runs after template is verified/downloaded)
-    - name: Create LXC container
+    # 2. AUTOMATICALLY DOWNLOAD TEMPLATE IF MISSING
+    - name: Ensure Template is Present on Host
       ansible.builtin.uri:
-        url: "{{ proxmox_api_url }}/nodes/{{ proxmox_node }}/lxc"
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/aplinfo"
         method: POST
         headers:
-          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
           Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-        body_format: json
+          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+        body_format: form-urlencoded
         body:
-          vmid: "{{ proxmox_lxc_id }}"
-          ostemplate: "{{ proxmox_storage }}:vztmpl/{{ lxc_template_name }}"
-          cores: 2
-          memory: 2048
-          rootfs: "local-lvm:8" # Adjust to match your thin pool storage
-          networks: "name=eth0,bridge=vmbr0,ip=dhcp"
+          node: "{{ proxmox_node }}"
+          storage: "local"
+          template: "{{ template_filename }}"
         validate_certs: false
+        status_code: [200, 201, 500] # Ignores failure if it's already there
+      register: template_download
+
+    # 3. CREATE THE LXC CONTAINER
+    - name: Create LXC container
+      ansible.builtin.uri:
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/lxc"
+        method: POST
+        headers:
+          Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
+          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+        body_format: form-urlencoded
+        body:
+          vmid: "{{ proxmox_vmid }}"
+          hostname: "{{ proxmox_hostname }}"
+          ostemplate: "{{ proxmox_template }}"
+          storage: "local-lvm"
+          rootfs: "8"
+          cores: "2"
+          memory: "2048"
+          net0: "name=eth0,bridge=vmbr0,ip=dhcp,type=veth"
+          onboot: 1
+          unprivileged: 1
+        validate_certs: false
+        return_content: true
         status_code: 200
+      register: lxc_create
+      no_log: true
+
+    # 4. CONFIRM SUBMISSION
+    - name: Display LXC creation result
+      ansible.builtin.debug:
+        msg: "LXC {{ proxmox_vmid }} creation request submitted successfully."
 
