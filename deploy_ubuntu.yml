@@ -27,22 +27,40 @@
       register: proxmox_auth
       no_log: true
 
-    # 2. AUTOMATICALLY DOWNLOAD TEMPLATE IF MISSING
-    - name: Ensure Template is Present on Host
-      ansible.builtin.uri:
-        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/aplinfo"
-        method: POST
-        headers:
-          Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
-        body_format: form-urlencoded
-        body:
-          node: "{{ proxmox_node }}"
-          storage: "local"
-          template: "{{ template_filename }}"
-        validate_certs: false
-        status_code: [200, 201, 500] # Ignores failure if it's already there
-      register: template_download
+   # 2a. LOOK UP THE CURRENT UBUNTU 24.04 TEMPLATE NAME FROM PROXMOX'S CATALOG
+- name: Get Proxmox appliance catalog
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_host }}:8006/api2/json/nodes/{{ proxmox_node }}/aplinfo"
+    method: GET
+    headers:
+      CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+      Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
+    validate_certs: false
+    status_code: [200]
+  register: apl_list
+
+- name: Resolve exact Ubuntu 24.04 standard template filename
+  ansible.builtin.set_fact:
+    resolved_template: >-
+      {{ (apl_list.json.data
+          | selectattr('template', 'search', 'ubuntu-24.04-standard')
+          | list | first).template }}
+
+# 2b. DOWNLOAD IT IF NOT ALREADY PRESENT
+- name: Ensure Template is Present on Host
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_host }}:8006/api2/json/nodes/{{ proxmox_node }}/aplinfo"
+    method: POST
+    headers:
+      CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+      Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
+    body_format: form-urlencoded
+    body:
+      storage: "{{ proxmox_storage }}"
+      template: "{{ resolved_template }}"
+    status_code: [200, 201, 500]
+    validate_certs: false
+  register: template_status
 
     # 3. CREATE THE LXC CONTAINER
     - name: Create LXC container
