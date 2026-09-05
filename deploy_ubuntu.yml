@@ -26,16 +26,15 @@
       register: proxmox_auth
       no_log: true
 
-    # 2. DOWNLOAD TEMPLATE VIA API (Uses tokens from step 1)
-        # 2. DOWNLOAD TEMPLATE VIA API
+       # 2. DOWNLOAD TEMPLATE VIA API
     - name: Ensure Ubuntu 24.04 Template is Present
       ansible.builtin.uri:
-        url: "https://192.168.1" # <--- Fix this URL
+        url: "https://192.168.1" # <--- Ensure this is fully typed out
         method: POST
         headers:
           CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
           Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-        body_format: json
+        body_format: form-urlencoded    # <--- Switch this to form-urlencoded for this specific endpoint
         body:
           node: "prox1"
           storage: "local"
@@ -43,6 +42,7 @@
         status_code: [200, 201, 500]
         validate_certs: false
       register: template_status
+
 
     # 3. CREATE LXC CONTAINER (Only runs after template is verified/downloaded)
     - name: Create LXC container
