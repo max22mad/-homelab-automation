@@ -99,10 +99,12 @@
       retries: 20
       delay: 3
 
-    - name: Fail if LXC creation task errored
-      ansible.builtin.fail:
-        msg: "LXC creation failed: {{ task_result.json.data.exitstatus }}"
-      when: task_result.json.data.exitstatus != "OK"
+ - name: Fail if LXC creation task errored
+  ansible.builtin.fail:
+    msg: "LXC creation failed: {{ task_result.json.data.exitstatus }}"
+  when: >-
+    task_result.json.data.exitstatus != "OK"
+    and not (task_result.json.data.exitstatus is search("^WARNINGS"))
 
     # 4. CONFIRM SUBMISSION
     - name: Display LXC creation result
