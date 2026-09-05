@@ -27,21 +27,32 @@
       no_log: true
 
         # 2. DOWNLOAD TEMPLATE VIA API
-    - name: Ensure Ubuntu 24.04 Template is Present
-      ansible.builtin.uri:
-        url: "https://192.168.1" # <--- Confirm this exact string is saved
-        method: POST
-        headers:
-          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
-          Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-        body_format: form-urlencoded
-        body:
-          node: "prox1"
-          storage: "local"
-          template: "ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
-        status_code: [200, 201, 500]
-        validate_certs: false
-      register: template_status
+- name: Check if Ubuntu 24.04 Template is Present
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_storage }}/content?content=vztmpl"
+    method: GET
+    headers:
+      CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+      Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
+    validate_certs: false
+    status_code: [200]
+  register: template_status
+
+- name: Download Ubuntu 24.04 Template if missing
+  ansible.builtin.uri:
+    url: "https://{{ proxmox_host }}:8006/api2/json/nodes/{{ proxmox_node }}/storage/{{ proxmox_storage }}/download-url"
+    method: POST
+    headers:
+      CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
+      Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
+    body_format: form-urlencoded
+    body:
+      content: vztmpl
+      filename: "{{ lxc_template_name }}"
+      url: "http://download.proxmox.com/images/system/{{ lxc_template_name }}"
+    validate_certs: false
+    status_code: [200]
+  when: template_status.json.data | selectattr('volid', 'search', lxc_template_name) | list | length == 0
 
 
 
