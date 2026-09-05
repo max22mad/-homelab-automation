@@ -16,7 +16,7 @@
     # 1. AUTHENTICATE FIRST (Using the password you fixed in Task #65)
     - name: Authenticate to Proxmox API
       ansible.builtin.uri:
-        url: "{{ proxmox_api_url }}/access/ticket"
+        url: "https://{{ proxmox_host }}:8006/api2/json/access/ticket"
         method: POST
         body_format: form-urlencoded
         body:
