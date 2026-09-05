@@ -47,20 +47,22 @@
               | list | first).template }}
 
     # 2b. DOWNLOAD IT IF NOT ALREADY PRESENT
-    - name: Ensure Template is Present on Host
+       - name: Wait for LXC creation task to complete
       ansible.builtin.uri:
-        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/aplinfo"
-        method: POST
+        url: "https://{{ proxmox_api_host }}:8006/api2/json/nodes/{{ proxmox_node }}/tasks/{{ lxc_create.json.data }}/status"
+        method: GET
         headers:
-          CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
           Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
-        body_format: form-urlencoded
-        body:
-          storage: "{{ proxmox_storage }}"
-          template: "{{ resolved_template }}"
-        status_code: [200, 201, 500]
         validate_certs: false
-      register: template_status
+      register: task_result
+      until: task_result.json.data.status == "stopped"
+      retries: 20
+      delay: 3
+
+    - name: Fail if LXC creation task errored
+      ansible.builtin.fail:
+        msg: "LXC creation failed: {{ task_result.json.data.exitstatus }}"
+      when: task_result.json.data.exitstatus != "OK"
 
     # 3. CREATE THE LXC CONTAINER
     - name: Create LXC container
