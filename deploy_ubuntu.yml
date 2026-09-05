@@ -27,19 +27,20 @@
       no_log: true
 
     # 2. DOWNLOAD TEMPLATE VIA API (Uses tokens from step 1)
+        # 2. DOWNLOAD TEMPLATE VIA API
     - name: Ensure Ubuntu 24.04 Template is Present
       ansible.builtin.uri:
-        url: "{{ proxmox_api_url }}/nodes/{{ proxmox_node }}/aplinfo"
+        url: "https://192.168.1" # <--- Fix this URL
         method: POST
         headers:
           CSRFPreventionToken: "{{ proxmox_auth.json.data.CSRFPreventionToken }}"
           Cookie: "PVEAuthCookie={{ proxmox_auth.json.data.ticket }}"
         body_format: json
         body:
-          node: "{{ proxmox_node }}"
-          storage: "{{ proxmox_storage }}"
-          template: "{{ lxc_template_name }}"
-        status_code: [200, 201, 500] # 500 can be ignored if already exists
+          node: "prox1"
+          storage: "local"
+          template: "ubuntu-24.04-standard_24.04-1_amd64.tar.zst"
+        status_code: [200, 201, 500]
         validate_certs: false
       register: template_status
 
