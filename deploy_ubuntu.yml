@@ -3,6 +3,8 @@
   hosts: localhost
   gather_facts: false
   vars:
+    proxmox_user: root<--- Add this line here
+
     # It's best to keep these in Semaphore environment variables
     proxmox_api_url: "https://yourdomain.local"
     proxmox_node: "prox1"
